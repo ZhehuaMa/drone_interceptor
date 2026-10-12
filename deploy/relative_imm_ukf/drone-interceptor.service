@@ -1,0 +1,22 @@
+[Unit]
+Description=Drone interceptor relative IMM-UKF node (prebuilt binary)
+After=local-fs.target network.target
+StartLimitIntervalSec=60
+StartLimitBurst=5
+
+[Service]
+Type=simple
+ExecStart=/opt/drone_interceptor-binary/current/run.sh
+WorkingDirectory=/opt/drone_interceptor-binary/current
+Environment=ROS_LOG_DIR=/var/log/drone_interceptor
+LogsDirectory=drone_interceptor
+# 绑定到隔离的大核 4-7；run.sh 内的 taskset 与此保持一致（双保险）。
+CPUAffinity=4-7
+Restart=on-failure
+RestartSec=3
+KillSignal=SIGINT
+TimeoutStopSec=15
+UMask=0022
+
+[Install]
+WantedBy=multi-user.target

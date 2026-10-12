@@ -24,7 +24,7 @@ find_package(std_msgs REQUIRED)
 find_package(mavros_msgs REQUIRED)
 find_package(Eigen3 REQUIRED)
 
-find_package(acados REQUIRED)
+# find_package(acados REQUIRED)
 # get_target_property(BLASFEO_INCLUDE_DIR 
 #   blasfeo INTERFACE_INCLUDE_DIRECTORIES)
 # get_target_property(HPIPM_INCLUDE_DIR 
@@ -35,15 +35,15 @@ find_package(acados REQUIRED)
 # =============================================================================
 # Add the path to the ACADOS-generated C code.
 # You MUST run the python script `drone_model.py` or `drone_model_quaternion.py` first to generate this directory.
-set(ACADOS_GENERATED_CODE_DIR "${PROJECT_SOURCE_DIR}/prototype/c_generated_code")
+# set(ACADOS_GENERATED_CODE_DIR "${PROJECT_SOURCE_DIR}/prototype/c_generated_code")
 
 # Include ACADOS header files
-include_directories(
-    ${ACADOS_GENERATED_CODE_DIR}
-    ${EIGEN3_INCLUDE_DIR}
-    ${BLASFEO_INCLUDE_DIR}
-    ${HPIPM_INCLUDE_DIR}
-)
+# include_directories(
+#     ${ACADOS_GENERATED_CODE_DIR}
+#     ${EIGEN3_INCLUDE_DIR}
+#     ${BLASFEO_INCLUDE_DIR}
+#     ${HPIPM_INCLUDE_DIR}
+# )
 
 # Add the ACADOS libraries that were generated
 # add_library(acados_solver STATIC
@@ -105,93 +105,93 @@ include_directories(
 
     
 # Quaternion version
-add_executable(interceptor_node_quaternion
-    src/interceptor_node_base.cpp
-    src/interceptor_node_quaternion.cpp
+# add_executable(interceptor_node_quaternion
+#     src/interceptor_node_base.cpp
+#     src/interceptor_node_quaternion.cpp
+# 
+#     ${ACADOS_GENERATED_CODE_DIR}/drone_interceptor_mpc_quat_model/drone_interceptor_mpc_quat_expl_ode_fun.c
+#     ${ACADOS_GENERATED_CODE_DIR}/drone_interceptor_mpc_quat_model/drone_interceptor_mpc_quat_expl_vde_forw.c
+#     ${ACADOS_GENERATED_CODE_DIR}/drone_interceptor_mpc_quat_model/drone_interceptor_mpc_quat_expl_vde_adj.c
+# 
+#     ${ACADOS_GENERATED_CODE_DIR}/drone_interceptor_mpc_quat_cost/drone_interceptor_mpc_quat_cost_y_0_fun.c
+#     ${ACADOS_GENERATED_CODE_DIR}/drone_interceptor_mpc_quat_cost/drone_interceptor_mpc_quat_cost_y_0_fun_jac_ut_xt.c
+#     ${ACADOS_GENERATED_CODE_DIR}/drone_interceptor_mpc_quat_cost/drone_interceptor_mpc_quat_cost_y_0_hess.c
+#     ${ACADOS_GENERATED_CODE_DIR}/drone_interceptor_mpc_quat_cost/drone_interceptor_mpc_quat_cost_y_fun.c
+#     ${ACADOS_GENERATED_CODE_DIR}/drone_interceptor_mpc_quat_cost/drone_interceptor_mpc_quat_cost_y_fun_jac_ut_xt.c
+#     ${ACADOS_GENERATED_CODE_DIR}/drone_interceptor_mpc_quat_cost/drone_interceptor_mpc_quat_cost_y_hess.c
+#     ${ACADOS_GENERATED_CODE_DIR}/drone_interceptor_mpc_quat_cost/drone_interceptor_mpc_quat_cost_y_e_fun.c
+#     ${ACADOS_GENERATED_CODE_DIR}/drone_interceptor_mpc_quat_cost/drone_interceptor_mpc_quat_cost_y_e_fun_jac_ut_xt.c
+#     ${ACADOS_GENERATED_CODE_DIR}/drone_interceptor_mpc_quat_cost/drone_interceptor_mpc_quat_cost_y_e_hess.c
+# 
+#     ${ACADOS_GENERATED_CODE_DIR}/acados_solver_drone_interceptor_mpc_quat.c
+# )
 
-    ${ACADOS_GENERATED_CODE_DIR}/drone_interceptor_mpc_quat_model/drone_interceptor_mpc_quat_expl_ode_fun.c
-    ${ACADOS_GENERATED_CODE_DIR}/drone_interceptor_mpc_quat_model/drone_interceptor_mpc_quat_expl_vde_forw.c
-    ${ACADOS_GENERATED_CODE_DIR}/drone_interceptor_mpc_quat_model/drone_interceptor_mpc_quat_expl_vde_adj.c
-
-    ${ACADOS_GENERATED_CODE_DIR}/drone_interceptor_mpc_quat_cost/drone_interceptor_mpc_quat_cost_y_0_fun.c
-    ${ACADOS_GENERATED_CODE_DIR}/drone_interceptor_mpc_quat_cost/drone_interceptor_mpc_quat_cost_y_0_fun_jac_ut_xt.c
-    ${ACADOS_GENERATED_CODE_DIR}/drone_interceptor_mpc_quat_cost/drone_interceptor_mpc_quat_cost_y_0_hess.c
-    ${ACADOS_GENERATED_CODE_DIR}/drone_interceptor_mpc_quat_cost/drone_interceptor_mpc_quat_cost_y_fun.c
-    ${ACADOS_GENERATED_CODE_DIR}/drone_interceptor_mpc_quat_cost/drone_interceptor_mpc_quat_cost_y_fun_jac_ut_xt.c
-    ${ACADOS_GENERATED_CODE_DIR}/drone_interceptor_mpc_quat_cost/drone_interceptor_mpc_quat_cost_y_hess.c
-    ${ACADOS_GENERATED_CODE_DIR}/drone_interceptor_mpc_quat_cost/drone_interceptor_mpc_quat_cost_y_e_fun.c
-    ${ACADOS_GENERATED_CODE_DIR}/drone_interceptor_mpc_quat_cost/drone_interceptor_mpc_quat_cost_y_e_fun_jac_ut_xt.c
-    ${ACADOS_GENERATED_CODE_DIR}/drone_interceptor_mpc_quat_cost/drone_interceptor_mpc_quat_cost_y_e_hess.c
-
-    ${ACADOS_GENERATED_CODE_DIR}/acados_solver_drone_interceptor_mpc_quat.c
-)
-
-ament_target_dependencies(interceptor_node_quaternion
-    rclcpp
-    geometry_msgs
-    nav_msgs
-    vision_msgs
-    quadrotor_msgs
-    sensor_msgs
-    std_msgs
-    mavros_msgs
-)
-
-target_link_directories(interceptor_node_quaternion PRIVATE
-    ${ACADOS_GENERATED_CODE_DIR}
-)
-
-target_link_libraries(interceptor_node_quaternion
-    acados
-    blasfeo
-    hpipm
-    m
-)
+# ament_target_dependencies(interceptor_node_quaternion
+#     rclcpp
+#     geometry_msgs
+#     nav_msgs
+#     vision_msgs
+#     quadrotor_msgs
+#     sensor_msgs
+#     std_msgs
+#     mavros_msgs
+# )
+# 
+# target_link_directories(interceptor_node_quaternion PRIVATE
+#     ${ACADOS_GENERATED_CODE_DIR}
+# )
+# 
+# target_link_libraries(interceptor_node_quaternion
+#     acados
+#     blasfeo
+#     hpipm
+#     m
+# )
 
 
 # Dual Quaternion version (NONLINEAR_LS cost)
-add_executable(interceptor_node_dq
-    src/interceptor_node_base.cpp
-    src/interceptor_node_dq.cpp
-
-    ${ACADOS_GENERATED_CODE_DIR}/drone_interceptor_dq_model/drone_interceptor_dq_expl_ode_fun.c
-    ${ACADOS_GENERATED_CODE_DIR}/drone_interceptor_dq_model/drone_interceptor_dq_expl_vde_forw.c
-    ${ACADOS_GENERATED_CODE_DIR}/drone_interceptor_dq_model/drone_interceptor_dq_expl_vde_adj.c
-
-    ${ACADOS_GENERATED_CODE_DIR}/drone_interceptor_dq_cost/drone_interceptor_dq_cost_y_0_fun.c
-    ${ACADOS_GENERATED_CODE_DIR}/drone_interceptor_dq_cost/drone_interceptor_dq_cost_y_0_fun_jac_ut_xt.c
-    ${ACADOS_GENERATED_CODE_DIR}/drone_interceptor_dq_cost/drone_interceptor_dq_cost_y_0_hess.c
-    ${ACADOS_GENERATED_CODE_DIR}/drone_interceptor_dq_cost/drone_interceptor_dq_cost_y_fun.c
-    ${ACADOS_GENERATED_CODE_DIR}/drone_interceptor_dq_cost/drone_interceptor_dq_cost_y_fun_jac_ut_xt.c
-    ${ACADOS_GENERATED_CODE_DIR}/drone_interceptor_dq_cost/drone_interceptor_dq_cost_y_hess.c
-    ${ACADOS_GENERATED_CODE_DIR}/drone_interceptor_dq_cost/drone_interceptor_dq_cost_y_e_fun.c
-    ${ACADOS_GENERATED_CODE_DIR}/drone_interceptor_dq_cost/drone_interceptor_dq_cost_y_e_fun_jac_ut_xt.c
-    ${ACADOS_GENERATED_CODE_DIR}/drone_interceptor_dq_cost/drone_interceptor_dq_cost_y_e_hess.c
-
-    ${ACADOS_GENERATED_CODE_DIR}/acados_solver_drone_interceptor_dq.c
-)
-
-ament_target_dependencies(interceptor_node_dq
-    rclcpp
-    geometry_msgs
-    nav_msgs
-    vision_msgs
-    quadrotor_msgs
-    sensor_msgs
-    std_msgs
-    mavros_msgs
-)
-
-target_link_directories(interceptor_node_dq PRIVATE
-    ${ACADOS_GENERATED_CODE_DIR}
-)
-
-target_link_libraries(interceptor_node_dq
-    acados
-    blasfeo
-    hpipm
-    m
-)
+# add_executable(interceptor_node_dq
+#     src/interceptor_node_base.cpp
+#     src/interceptor_node_dq.cpp
+# 
+#     ${ACADOS_GENERATED_CODE_DIR}/drone_interceptor_dq_model/drone_interceptor_dq_expl_ode_fun.c
+#     ${ACADOS_GENERATED_CODE_DIR}/drone_interceptor_dq_model/drone_interceptor_dq_expl_vde_forw.c
+#     ${ACADOS_GENERATED_CODE_DIR}/drone_interceptor_dq_model/drone_interceptor_dq_expl_vde_adj.c
+# 
+#     ${ACADOS_GENERATED_CODE_DIR}/drone_interceptor_dq_cost/drone_interceptor_dq_cost_y_0_fun.c
+#     ${ACADOS_GENERATED_CODE_DIR}/drone_interceptor_dq_cost/drone_interceptor_dq_cost_y_0_fun_jac_ut_xt.c
+#     ${ACADOS_GENERATED_CODE_DIR}/drone_interceptor_dq_cost/drone_interceptor_dq_cost_y_0_hess.c
+#     ${ACADOS_GENERATED_CODE_DIR}/drone_interceptor_dq_cost/drone_interceptor_dq_cost_y_fun.c
+#     ${ACADOS_GENERATED_CODE_DIR}/drone_interceptor_dq_cost/drone_interceptor_dq_cost_y_fun_jac_ut_xt.c
+#     ${ACADOS_GENERATED_CODE_DIR}/drone_interceptor_dq_cost/drone_interceptor_dq_cost_y_hess.c
+#     ${ACADOS_GENERATED_CODE_DIR}/drone_interceptor_dq_cost/drone_interceptor_dq_cost_y_e_fun.c
+#     ${ACADOS_GENERATED_CODE_DIR}/drone_interceptor_dq_cost/drone_interceptor_dq_cost_y_e_fun_jac_ut_xt.c
+#     ${ACADOS_GENERATED_CODE_DIR}/drone_interceptor_dq_cost/drone_interceptor_dq_cost_y_e_hess.c
+# 
+#     ${ACADOS_GENERATED_CODE_DIR}/acados_solver_drone_interceptor_dq.c
+# )
+# 
+# ament_target_dependencies(interceptor_node_dq
+#     rclcpp
+#     geometry_msgs
+#     nav_msgs
+#     vision_msgs
+#     quadrotor_msgs
+#     sensor_msgs
+#     std_msgs
+#     mavros_msgs
+# )
+# 
+# target_link_directories(interceptor_node_dq PRIVATE
+#     ${ACADOS_GENERATED_CODE_DIR}
+# )
+# 
+# target_link_libraries(interceptor_node_dq
+#     acados
+#     blasfeo
+#     hpipm
+#     m
+# )
 
 # Relative IMM-UKF version
 add_executable(interceptor_node_relative_imm_ukf
@@ -210,12 +210,11 @@ ament_target_dependencies(interceptor_node_relative_imm_ukf
 )
 
 target_link_libraries(interceptor_node_relative_imm_ukf
+    Eigen3::Eigen
     m
 )
 
 install(TARGETS
-  interceptor_node_quaternion
-  interceptor_node_dq
   interceptor_node_relative_imm_ukf
   DESTINATION lib/${PROJECT_NAME} 
 )

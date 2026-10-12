@@ -193,3 +193,4 @@ cd ~/workspace/fpv_ws && colcon build --packages-select drone_interceptor
   (72° / 1920x1200) — a 35% focal error that corrupts both the handover width and the terminal
   monocular range. Align them before any AirSim run.
 - `acados`/`blasfeo`/`hpipm`/`Eigen` not declared in `package.xml` — `rosdep` won't install; manual system install required
+- `quadrotor_msgs` not in rosdep index either — `ControlCommand` needs its source vendored into the workspace `src/` (mount or clone, then `colcon build` alongside `drone_interceptor`). Verified working in `drone-tracker-rk3576:humble-arm64-rknn2.3.2` (NMPC targets currently commented out in CMakeLists, so acados/blasfeo/hpipm not exercised by that verification) — see `docs/DOCKER_BUILD.md`

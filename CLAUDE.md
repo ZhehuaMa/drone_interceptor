@@ -12,7 +12,7 @@ Vision-based drone interception. A ROS2 (ament_cmake, C++17) package that runs a
 
 ### Manual dependencies (not in package.xml)
 
-`acados`, `blasfeo`, `hpipm`, and `Eigen3` must be installed on the system yourself — they are NOT declared in `package.xml`, so `rosdep` will not install them. `quadrotor_msgs` (the `ControlCommand` type) is also an external package dependency.
+`acados`, `blasfeo`, `hpipm`, and `Eigen3` must be installed on the system yourself — they are NOT declared in `package.xml`, so `rosdep` will not install them. `quadrotor_msgs` (the `ControlCommand` type) is also an external package dependency, and it isn't in the rosdep index either — vendor its source into the workspace `src/` (mount or clone) and build it alongside `drone_interceptor`. See `docs/DOCKER_BUILD.md` for a verified recipe against `drone-tracker-rk3576:humble-arm64-rknn2.3.2`.
 
 ### Build — NMPC variants require a codegen step first
 
