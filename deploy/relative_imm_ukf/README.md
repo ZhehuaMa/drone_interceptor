@@ -88,8 +88,9 @@ sudo systemctl start drone-interceptor
 
 ## 重新生成部署包（维护者）
 
-二进制必须在与目标板同规格的 aarch64 机器上编译。板上内存有限（约 4 GB 且无 swap），
-编译 `interceptor_node_relative_imm_ukf.cpp` 可能被 OOM 杀掉，必要时先加 swap。
+The executable must target ARM64 and compatible Ubuntu 22.04/ROS 2 Humble libraries. It does not have to be compiled on an aarch64 machine: the default x86_64 image has now cross-compiled this node and the real ARM64 message package successfully. See [current build commands](../../docs/DOCKER_BUILD.md).
+
+Packaging remains a separate limitation. `make_bundle.sh` explicitly requires `uname -m` to report `aarch64` and uses native `ldd` to resolve ARM dependencies. Run it on a compatible ARM64 board or in a prepared ARM64 container with matching inputs. Direct packaging in the x86_64 image is currently unsupported. The newly cross-built installation has not been verified through this complete bundle/install procedure. The board-side command below is retained as a supported example; building on a roughly 4 GiB board can exhaust memory.
 
 ```bash
 # 板上，已有 colcon install 产物后：

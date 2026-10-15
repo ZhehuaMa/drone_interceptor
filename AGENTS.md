@@ -125,19 +125,28 @@ target before the target is inside the camera FOV, then hands over to vision.
   `/fpv/radar_state` (`std_msgs/Int8`, same encoding as `/fpv/tracker_state`) which `apm_bridge`
   uses to allow the MISSION trigger on a radar lock alone.
 
+## Remote development
+
+Read `AGENTS.local.md` and `/home/mzh/nickluo/AGENTS.local.md` before building. Current workspace: `/home/mzh/nickluo/drone_interceptor`. Use the default x86_64 image instructions in `docs/DOCKER_BUILD.md`. Native output runs host simulations; the same image cross-compiles ARM64 deployment output. Select the ARM64 image explicitly for fallback. Physical target runtime still requires the target board.
+
 ## Build
 
+Current `CMakeLists.txt` enables `interceptor_node_relative_imm_ukf` only. It requires the real
+`quadrotor_msgs` source package and does not require acados. Use the native or ARM64 cross-build recipe in `docs/DOCKER_BUILD.md`; both mount real message source read-only.
+Keep architecture-specific build/install/log outputs outside the source tree.
+
+For an explicitly enabled NMPC variant, prepare acados, blasfeo and hpipm first. Generate its
+C solver before building that variant in a prepared ROS 2 workspace:
+
 ```bash
-# 1. Generate acados C solver (must run BEFORE colcon build) — NMPC variants only
-cd prototype && python3 drone_model_quaternion.py   # or drone_model_dq.py
-# 2. Build all targets
-cd ~/workspace/fpv_ws && colcon build --packages-select drone_interceptor
+cd /home/mzh/nickluo/drone_interceptor/prototype
+python3 drone_model_quaternion.py   # or drone_model_dq.py
 ```
 
 - C++17, Release mode, `ament_cmake`
 - NMPC targets link: `acados`, `blasfeo`, `hpipm`, `m`
 - `relative_imm_ukf` target links: `m` only
-- Generated C code in `prototype/c_generated_code/` compiled directly into NMPC executables
+- Generated C code in `prototype/c_generated_code/` compiled directly into enabled NMPC executables
 
 ### Executable targets
 
@@ -193,4 +202,4 @@ cd ~/workspace/fpv_ws && colcon build --packages-select drone_interceptor
   (72° / 1920x1200) — a 35% focal error that corrupts both the handover width and the terminal
   monocular range. Align them before any AirSim run.
 - `acados`/`blasfeo`/`hpipm`/`Eigen` not declared in `package.xml` — `rosdep` won't install; manual system install required
-- `quadrotor_msgs` not in rosdep index either — `ControlCommand` needs its source vendored into the workspace `src/` (mount or clone, then `colcon build` alongside `drone_interceptor`). Verified working in `drone-tracker-rk3576:humble-arm64-rknn2.3.2` (NMPC targets currently commented out in CMakeLists, so acados/blasfeo/hpipm not exercised by that verification) — see `docs/DOCKER_BUILD.md`
+- `quadrotor_msgs` not in rosdep index either — `ControlCommand` needs its source vendored into the workspace `src/` (mount or clone, then `colcon build` alongside `drone_interceptor`). Verified natively and cross-compiled to ARM64 in the default `drone-tracker-rk3576:humble-amd64-rknn2.3.2` image. The ARM64 image remains an explicit fallback. NMPC dependencies are not covered — see `docs/DOCKER_BUILD.md`

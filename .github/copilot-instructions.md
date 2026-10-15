@@ -56,6 +56,8 @@ utils.h                                  — DroneEKF(19D), MissionStateMachine,
 
 ## Build
 
+The enabled target is `interceptor_node_relative_imm_ukf`, which needs no acados. Follow `docs/DOCKER_BUILD.md` for the default x86_64 image: native simulation builds or real ARM64 cross-builds with matching `quadrotor_msgs`. ARM64-image builds are explicit fallback. Keep build output outside source. The commands below are historical examples for explicitly enabled NMPC targets:
+
 ```bash
 # 1. Generate acados C solver (must run BEFORE colcon build) — NMPC variants only
 cd prototype && python3 drone_model_quaternion.py   # or drone_model_dq.py
@@ -118,4 +120,4 @@ cd ~/workspace/fpv_ws && colcon build --packages-select drone_interceptor
 - The width handover rides on `focal_length_` (from `camera.width_px` + `camera.fov_deg`);
   `airsim_settings.json` (30° / 960x960) does NOT match the launch defaults (72° / 1920x1200)
 - `acados`/`blasfeo`/`hpipm`/`Eigen` not declared in `package.xml` — `rosdep` won't install; manual system install required
-- `quadrotor_msgs` not in rosdep index either — `ControlCommand` needs its source vendored into the workspace `src/` (mount or clone, then `colcon build` alongside `drone_interceptor`). Verified working in `drone-tracker-rk3576:humble-arm64-rknn2.3.2` (NMPC targets currently commented out in CMakeLists, so acados/blasfeo/hpipm not exercised by that verification) — see `docs/DOCKER_BUILD.md`
+- `quadrotor_msgs` not in rosdep index either — `ControlCommand` needs its source vendored into the workspace `src/` (mount or clone, then `colcon build` alongside `drone_interceptor`). Verified natively and cross-compiled to ARM64 in the default `drone-tracker-rk3576:humble-amd64-rknn2.3.2` image. The ARM64 image remains an explicit fallback. NMPC dependencies are not covered — see `docs/DOCKER_BUILD.md`

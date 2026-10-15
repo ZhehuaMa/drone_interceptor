@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
-# 在开发板（或同规格 ARM64 机器）上把已编译好的 colcon install 目录打成离线部署包。
-# 本脚本不编译，只做收集、校验和打包。
+# Package existing ARM64 output; compilation may use the x86_64 cross compiler.
+# This collector still needs an ARM execution environment (uname/ldd below).
+# It collects and validates files; it does not compile them.
 set -euo pipefail
 export LC_ALL=C
 

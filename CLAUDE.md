@@ -8,11 +8,11 @@ Vision-based drone interception. A ROS2 (ament_cmake, C++17) package that runs a
 
 ## Build & Run
 
-**Workspace root is `/media/nick/data/workspace/fpv_ws`** (this package lives at `src/drone_interceptor`).
+Current source: `/home/mzh/nickluo/drone_interceptor`. Read `AGENTS.local.md`. Use the current Docker recipes in `docs/DOCKER_BUILD.md`; later `/media/nick/` examples describe a historical workspace.
 
 ### Manual dependencies (not in package.xml)
 
-`acados`, `blasfeo`, `hpipm`, and `Eigen3` must be installed on the system yourself — they are NOT declared in `package.xml`, so `rosdep` will not install them. `quadrotor_msgs` (the `ControlCommand` type) is also an external package dependency, and it isn't in the rosdep index either — vendor its source into the workspace `src/` (mount or clone) and build it alongside `drone_interceptor`. See `docs/DOCKER_BUILD.md` for a verified recipe against `drone-tracker-rk3576:humble-arm64-rknn2.3.2`.
+`acados`, `blasfeo`, `hpipm`, and `Eigen3` must be installed on the system yourself — they are NOT declared in `package.xml`, so `rosdep` will not install them. `quadrotor_msgs` (the `ControlCommand` type) is also an external package dependency, and it isn't in the rosdep index either — vendor its source into the workspace `src/` (mount or clone) and build it alongside `drone_interceptor`. The default x86_64 image supports native simulation builds and verified ARM64 cross-builds. The ARM64 image is an explicit fallback. See `docs/DOCKER_BUILD.md` for current commands and unresolved simulation results. The enabled IMM-UKF target needs no acados; NMPC dependencies apply only when those disabled targets are enabled.
 
 ### Build — NMPC variants require a codegen step first
 
