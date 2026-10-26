@@ -1,8 +1,8 @@
 # drone_interceptor IMM-UKF 节点 · 开发板部署包
 
 目标平台：RK3576 开发板，Ubuntu 22.04 ARM64，PREEMPT_RT 内核，已预装 ROS 2 Humble。
-部署内容：`launch/launch_relative_imm_ukf.py` 所启动的节点 `interceptor_node_relative_imm_ukf`
-的预编译二进制，以 systemd 服务方式开机自启，进程绑定 **CPU 4-7**（内核 `isolcpus=4-7`
+部署内容：节点 `interceptor_node_relative_imm_ukf` 的预编译二进制。systemd 服务通过 `run.sh`
+直接启动该二进制，运行开关与 `launch/launch_relative_imm_ukf.py` 对应。服务开机自启，进程绑定 **CPU 4-7**（内核 `isolcpus=4-7`
 隔离出来的 Cortex-A72 大核）。
 
 包内不含 ROS 2 核心运行库，只随包携带 `quadrotor_msgs` 和 `vision_msgs` 的运行时库。
@@ -66,15 +66,30 @@ sudo systemctl disable --now drone-interceptor                          # 停止
 
 ```bash
 ros2 node list | grep interceptor_node_relative_imm_ukf
-ros2 topic hz /fpv/control_command       # 需外部有 IMU/bbox 输入才会发布
+ros2 topic hz /fpv/control_command       # 启动任务后，结合 IMU 与有效视觉或雷达输入检查控制输出
 ```
 
-订阅：`/mavros/imu/data`、`/fpv/target_bbox`、`/fpv/odom`、`/fpv/tracker_trigger`、
-`/fpv/mission_start`（启用雷达时还有 `/fpv/radar/target`、`/fpv/radar/interceptor`）。
-发布：`/fpv/control_command`、`/fpv/mission_state`。
+以下话题名以随包参数文件 `relative_imm_ukf_params.yaml` 为准；常规话题可通过 `topics.*` 修改，
+雷达话题可通过 `radar.topic_target` 和 `radar.topic_interceptor` 修改，修改后需重启节点。
 
-**进程存活 ≠ 功能验收。** 必须用真实 IMU/检测/里程计数据确认 `/fpv/mission_state` 流转与
-`/fpv/control_command` 输出合理，才算部署通过。
+| 方向 | 话题 | 消息类型 | 用途 |
+|------|------|----------|------|
+| 订阅 | `/mavros/imu/data` | `sensor_msgs/msg/Imu` | 机体姿态、加速度和角速度 |
+| 订阅 | `/fpv/target_bbox` | `vision_msgs/msg/Detection2D` | 视觉目标检测框 |
+| 订阅 | `/fpv/gimbal` | `sensor_msgs/msg/Imu` | 相机到世界的姿态；`camera.use_gimbal=true` 时使用 |
+| 订阅 | `/fpv/tracker_trigger` | `std_msgs/msg/Header` | `frame_id=MISSION` 启动任务；`OFF` 或 `DISMISS` 停止任务 |
+| 订阅 | `/fpv/mission_start` | `std_msgs/msg/Bool` | 仿真用任务触发；`true` 启动，`false` 停止 |
+| 订阅（仅启用雷达时） | `/fpv/radar/target` | `nav_msgs/msg/Odometry` | 雷达目标位置和速度 |
+| 订阅（仅启用雷达时） | `/fpv/radar/interceptor` | `nav_msgs/msg/Odometry` | 雷达拦截机位置和速度 |
+| 发布 | `/fpv/control_command` | `quadrotor_msgs/msg/ControlCommand` | 控制指令 |
+| 发布 | `/fpv/mission_state` | `std_msgs/msg/Bool` | 任务是否活动 |
+
+节点不再订阅 `/fpv/odom`。本机运动由 IMU 积分估计；可选雷达使用上表中的两路独立航迹。
+直接运行二进制且未加载参数文件时，`topics.mission` 默认值为 `/fpv/mission_launch`；
+部署包加载的参数文件将其设为 `/fpv/mission_start`。
+
+**进程存活 ≠ 功能验收。** 必须用真实 IMU、检测框和云台姿态输入，并触发任务，确认
+`/fpv/mission_state` 变化与 `/fpv/control_command` 输出合理。启用雷达时，还需验证两路雷达航迹及视觉接管。
 
 ## 回滚
 

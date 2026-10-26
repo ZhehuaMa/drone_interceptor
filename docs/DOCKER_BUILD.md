@@ -42,13 +42,13 @@ on the current x86_64 host still uses QEMU, an ARM instruction emulator, and can
 known ROS discovery limitations. No physical devices or host network are mounted.
 
 The historical ARM64-image instructions below remain a supported fallback. ARM64 output can also be built in the default x86_64 image.
-The disabled NMPC controller variants are outside the scenario runner's build.
+The former NMPC (model-predictive controller) variants have been removed. Their sources remain in Git history.
 
 ## Current native and ARM64 build capabilities
 
 An ARM64 container is not required for the enabled `interceptor_node_relative_imm_ukf`. The default x86_64 image builds native x86_64 simulation binaries or cross-compiles the same node for ARM64. These are separate outputs; use separate build/install directories and build the actual `quadrotor_msgs` source for each architecture.
 
-The currently enabled target needs Eigen and the ROS dependencies already in the image. The two NMPC (model-predictive controller) targets are disabled in `CMakeLists.txt`. Their acados/blasfeo/hpipm libraries and generated solver code are not covered by either image's validation.
+The only application target is `interceptor_node_relative_imm_ukf`. It needs Eigen and the ROS dependencies already in the image. The former NMPC targets and their generated solver integration have been removed from `CMakeLists.txt`. The current build needs no acados, blasfeo, hpipm, or solver code generation.
 
 ### Native compile without running scenarios
 
@@ -105,7 +105,9 @@ docker run --rm --network none --platform linux/amd64 \
   '
 ```
 
-The clean cross-build was independently run on 2026-10-15 with image ID `025d0aa88983`. Both the node and all generated message libraries are ELF ARM aarch64. The genuine ARM loader resolved every dependency, including the newly built message libraries. Evidence is in `/tmp/nickluo-submodule-image-audit-20261015/logs/`. No registered CTest cases exist for this node; build success is not a passing ROS simulation.
+The clean cross-build was independently run on 2026-10-15 with image ID `025d0aa88983`. Both the node and all generated message libraries are ELF ARM aarch64. The genuine ARM loader resolved every dependency, including the newly built message libraries. Evidence is in `/tmp/nickluo-submodule-image-audit-20261015/logs/`. This historical build predates the current CTest registration; it does not establish regression-test or ROS simulation results for the current source.
+
+Current `CMakeLists.txt` registers two CTest regression executables when configured with `-DBUILD_TESTING=ON`: `guidance_limits_test` and `camera_pose_history_test`. They check guidance math, IMU attitude integration, and timestamped camera orientation lookup. The ROS graph regression in `test/relative_imm_ukf_topics_test.py` runs separately with Python `unittest` in a sourced ROS workspace. None of these checks replaces the ROS interception scenarios.
 
 ### Explicit ARM64-image fallback
 
@@ -122,17 +124,16 @@ Native ROS scenario results remain distinct from cross-build results. The six na
 
 ## 结论
 
-本仓库当前**能**在该镜像里编译通过，唯一缺失的依赖是 `quadrotor_msgs`（提供
-`ControlCommand` 消息类型的 ROS2 包，`CMakeLists.txt:22 find_package(quadrotor_msgs REQUIRED)`
-用到）。
+2026-09-24 验证时，本仓库**能**在该镜像里编译通过，唯一缺失的依赖是 `quadrotor_msgs`（提供
+`ControlCommand` 消息类型的 ROS2 包，由 `find_package(quadrotor_msgs REQUIRED)` 引入）。
 
 - `Eigen3`（`libeigen3-dev`）镜像里已装好，不缺。
 - `rosdep install --simulate` 报错 `Cannot locate rosdep definition for [quadrotor_msgs]`——
   它不在 ROS 官方索引里，`apt`/`rosdep` 装不了，只能把源码放进 workspace 一起编。
-- **acados / blasfeo / hpipm 这次没有验证**：`CMakeLists.txt` 里 NMPC 相关的两个
-  target（quaternion / DQ 变体）当前整段被注释掉了，只有 `interceptor_node_relative_imm_ukf`
-  这一个 target 是激活的（该 target 只链接 `libm`，不需要 acados）。如果以后取消注释启用
-  NMPC 变体，acados/blasfeo/hpipm 需要额外装进镜像，本文档的验证结论不覆盖这部分。
+- **acados / blasfeo / hpipm 当时没有验证**：验证时，`CMakeLists.txt` 中两个 NMPC（模型预测控制）
+  变体（quaternion / DQ）的构建定义被整段注释，唯一启用的应用目标是
+  `interceptor_node_relative_imm_ukf`。这些 NMPC 源码及构建定义现已删除，可从 Git 历史查阅。
+  当前节点使用 Eigen、ROS 依赖和 `libm`，不需要 acados 或求解器代码生成。
 
 ## 依赖来源
 
