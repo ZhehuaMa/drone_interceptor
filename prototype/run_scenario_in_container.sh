@@ -23,6 +23,20 @@ case "$scenario" in
     radar*) launch_arguments+=(use_radar:=true) ;;
     *) launch_arguments+=(use_radar:=false) ;;
 esac
+# High-pitch scenarios need a 95-degree thrust tilt limit. On the stationary
+# bench, hold the known target width fixed because ownship motion cannot
+# provide the parallax needed to estimate width and range independently.
+tilt_params='physics.max_tilt_deg=95.0,physics.max_tilt_terminal_deg=95.0'
+case "$scenario" in
+    rig_*)
+        launch_arguments+=(
+            "extra_params:=${tilt_params},estimation.freeze_width=true,estimation.w_guess=1.5,controller.visual_speed_gain=0.0,controller.a_lat_tilt_start_deg=50.0"
+        )
+        ;;
+    dive)
+        launch_arguments+=("extra_params:=${tilt_params}")
+        ;;
+esac
 while [[ $# -gt 0 && "$1" == *:=* ]]; do
     launch_arguments+=("$1")
     shift
