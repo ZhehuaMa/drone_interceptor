@@ -92,8 +92,8 @@ interceptor_node_relative_imm_ukf:
 
     # Camera Intrinsic parameters
     camera:
-      width_px: 1536
-      height_px: 960
+      width_px: 1920
+      height_px: 1200
       # Intrinsics source — exactly one must be valid or the node refuses to start:
       #   fov_deg:    horizontal FOV in (0,180); vertical FOV derived from the aspect ratio
       #               (~48.8° here). 0.0 = unset.
