@@ -123,14 +123,14 @@ target before the target is inside the camera FOV, then hands over to vision.
   `/fpv/radar_state` (`std_msgs/Int8`, same encoding as `/fpv/tracker_state`) which `apm_bridge`
   uses to allow the MISSION trigger on a radar lock alone.
 
-## Remote development
+## Local instructions
 
-Read `AGENTS.local.md` and `/home/mzh/nickluo/AGENTS.local.md` before building. Current workspace: `/home/mzh/nickluo/drone_interceptor`. Use the default x86_64 image instructions in `docs/DOCKER_BUILD.md`. Native output runs host simulations; the same image cross-compiles ARM64 deployment output. Select the ARM64 image explicitly for fallback. Physical target runtime still requires the target board.
+Read `AGENTS.local.md` before building for environment-specific setup.
 
 ## Build
 
 Current `CMakeLists.txt` enables `interceptor_node_relative_imm_ukf` only. It requires the real
-`quadrotor_msgs` source package and does not require acados. Use the native or ARM64 cross-build recipe in `docs/DOCKER_BUILD.md`; both mount real message source read-only.
+`quadrotor_msgs` source package and does not require acados. See `docs/DOCKER_BUILD.md` for build instructions.
 Keep architecture-specific build/install/log outputs outside the source tree.
 
 - C++17, Release mode, `ament_cmake`
