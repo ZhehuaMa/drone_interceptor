@@ -137,15 +137,15 @@ public:
     double terminal_arrival_range_  = 0.0;
     // Speed-scheduled PN + attitude reference slew governor (v_des=20 oscillation fixes).
     double v_pn_ref_ = 1e9;       // cap on v_fwd in PN lateral accel -> bounds effective N*v at high speed
-    double max_att_rate_ = 1e9;   // max |d(tilt_mag)/dt|, |d(tilt_az)/dt| [rad/s] (slew governor)
-    double last_tilt_mag_ = 0.0;  // governor state (dedicated; axial block reuses last_t_/has_last_)
-    Eigen::Vector2d last_az_ = Eigen::Vector2d(1.0, 0.0);
+    double max_att_rate_ = 1e9;   // max |d(tilt_fwd)/dt|, |d(tilt_left)/dt| [rad/s] (slew governor)
+    double last_tilt_fwd_ = 0.0;  // governor state (dedicated; axial block reuses last_t_/has_last_)
+    double last_tilt_left_ = 0.0;
     double last_att_t_ = -1.0;
     bool   has_last_att_ = false;
     // Attitude-reference EMA low-pass (suppresses camera-rate content / roll limit-cycle).
-    double att_ref_tc_ = 0.15;    // EMA time constant on (tilt_mag, tilt_az) [s]
-    double last_tilt_mag_f_ = 0.0;  // EMA-filtered reference state
-    Eigen::Vector2d last_az_f_ = Eigen::Vector2d(1.0, 0.0);
+    double att_ref_tc_ = 0.15;    // EMA time constant on (tilt_fwd, tilt_left) [s]
+    double last_tilt_fwd_f_ = 0.0;  // EMA-filtered reference state
+    double last_tilt_left_f_ = 0.0;
     // sin(pitch)-keyed lateral-authority attenuation (a_lat -> 0 over the window): the single-axis
     // pitch gimbal cannot compensate roll, so banking swings the boresight azimuth by ~sin(pitch)
     // per radian of roll — lateral PN increasingly costs pointing as the nose-down pitch deepens.
@@ -234,12 +234,12 @@ public:
         last_axial_accel_ = 0.0;
         last_t_ = -1.0;
         has_last_ = false;
-        last_tilt_mag_ = 0.0;
-        last_az_ = Eigen::Vector2d(1.0, 0.0);
+        last_tilt_fwd_ = 0.0;
+        last_tilt_left_ = 0.0;
         last_att_t_ = -1.0;
         has_last_att_ = false;
-        last_tilt_mag_f_ = 0.0;
-        last_az_f_ = Eigen::Vector2d(1.0, 0.0);
+        last_tilt_fwd_f_ = 0.0;
+        last_tilt_left_f_ = 0.0;
         last_a_z_ = 0.0;
         last_az_t_ = -1.0;
         has_last_az_ = false;
@@ -762,34 +762,37 @@ public:
             }
         }
 
-        // Recompute the spherical parametrization after the clamps.
+        // Recompute the spherical normal coordinates (tilt_fwd, tilt_left) in the boresight
+        // frame after the clamps. The 2D vector u = tilt_mag * s_az has norm ||u|| = tilt_mag
+        // in [0, pi] (valid past 90 deg for missile-mode dives, unlike tan() which inverted
+        // past 90 deg) and has no polar-azimuth singularity at tilt=0 (where an independent
+        // angular EMA/slew on s_az swung +-180 deg through full nose-up/nose-down pitch on
+        // bank reversals).
         const double d_h_mag = d.head<2>().norm();
-        double tilt_mag = std::atan2(d_h_mag, d(2));      // 0..pi (past 90 deg = dive)
-        Eigen::Vector2d s_az = (d_h_mag > 1e-9) ? (d.head<2>() / d_h_mag) : fwd_h;
+        const double tilt_mag_raw = std::atan2(d_h_mag, d(2));      // 0..pi (past 90 deg = dive)
+        const Eigen::Vector2d s_az_raw = (d_h_mag > 1e-9) ? (d.head<2>() / d_h_mag) : fwd_h;
+        double tilt_fwd  = tilt_mag_raw * s_az_raw.dot(fwd_h);
+        double tilt_left = tilt_mag_raw * s_az_raw.dot(left_h);
 
         // ---- Attitude reference EMA low-pass ------------------------------------------------
         // Suppress camera-rate content / roll limit-cycle before the rate law. An EMA (vs the slew
         // governor below) is the right tool for a steady oscillation: it attenuates high-freq tilt
-        // swings while preserving the slow PN turn bias. Applied to the tilt magnitude and the
-        // tilt azimuth (ANGULAR EMA — a vector lerp passes through zero on a bank reversal and
-        // snaps the direction). Distinct from the body-rate decay coeff ctrl_coeff_; this filters
-        // the attitude REFERENCE, not the rate output.
+        // swings while preserving the slow PN turn bias. Applied to the boresight-frame normal
+        // coordinates (tilt_fwd, tilt_left) so bank reversals pass smoothly through zero lateral
+        // tilt instead of swinging the azimuth through +-90 deg (nose-up/nose-down pitch).
         if (has_last_att_ && att_ref_tc_ > 1e-6) {
             const double dt = t - last_att_t_;
             if (dt > 0.0 && dt < 1.0) {
                 const double a_ref = clamp(dt / att_ref_tc_, 0.0, 1.0);
-                tilt_mag = last_tilt_mag_f_ + a_ref * (tilt_mag - last_tilt_mag_f_);
-                const double az_now = std::atan2(s_az(1), s_az(0));
-                const double az_last = std::atan2(last_az_f_(1), last_az_f_(0));
-                const double az_f = az_last + a_ref * wrapAngle(az_now - az_last);
-                s_az = Eigen::Vector2d(std::cos(az_f), std::sin(az_f));
+                tilt_fwd  = last_tilt_fwd_f_  + a_ref * (tilt_fwd  - last_tilt_fwd_f_);
+                tilt_left = last_tilt_left_f_ + a_ref * (tilt_left - last_tilt_left_f_);
             }
         }
-        last_tilt_mag_f_ = tilt_mag;
-        last_az_f_ = s_az;
+        last_tilt_fwd_f_  = tilt_fwd;
+        last_tilt_left_f_ = tilt_left;
 
         // ---- Attitude reference slew governor ----------------------------------------------
-        // Bound |d(tilt_mag)/dt| and |d(az)/dt| so the desired thrust direction cannot flip
+        // Bound |d(tilt_fwd)/dt| and |d(tilt_left)/dt| so the desired thrust direction cannot flip
         // +-max_tilt in a single cycle. That flip is what bang-bangs the tilt channel into
         // +-max_body_rate saturation and drives the roll limit-cycle at high v_des. Mirrors the
         // axial_jerk_max_ slew limit above; uses dedicated state because the axial block already
@@ -798,18 +801,19 @@ public:
             const double dt = t - last_att_t_;
             if (dt > 0.0 && dt < 1.0) {
                 const double max_dtilt = max_att_rate_ * dt;
-                tilt_mag = clamp(tilt_mag, last_tilt_mag_ - max_dtilt, last_tilt_mag_ + max_dtilt);
-                const double az_now = std::atan2(s_az(1), s_az(0));
-                const double az_last = std::atan2(last_az_(1), last_az_(0));
-                const double d_az_s = clamp(wrapAngle(az_now - az_last), -max_dtilt, max_dtilt);
-                const double az_new = az_last + d_az_s;
-                s_az = Eigen::Vector2d(std::cos(az_new), std::sin(az_new));
+                tilt_fwd  = clamp(tilt_fwd,  last_tilt_fwd_  - max_dtilt, last_tilt_fwd_  + max_dtilt);
+                tilt_left = clamp(tilt_left, last_tilt_left_ - max_dtilt, last_tilt_left_ + max_dtilt);
             }
         }
-        last_tilt_mag_ = tilt_mag;
-        last_az_ = s_az;
+        last_tilt_fwd_  = tilt_fwd;
+        last_tilt_left_ = tilt_left;
         last_att_t_     = t;
         has_last_att_   = true;
+
+        const double tilt_mag = std::hypot(tilt_fwd, tilt_left);
+        const Eigen::Vector2d s_az = (tilt_mag > 1e-9)
+            ? ((tilt_fwd * fwd_h + tilt_left * left_h) / tilt_mag)
+            : fwd_h;
 
         // ---- (C) Rate commands: TWO-CHANNEL decomposition ---------------------------------
         //   heading channel: rotation about the world vertical — moves the camera plane (and so

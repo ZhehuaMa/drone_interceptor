@@ -785,12 +785,12 @@ class AdvancedHybridController:
         self.terminal_tilt_range = CTRL_TERMINAL_TILT_RANGE
         self.turn_radius_cap_factor = CTRL_TURN_RADIUS_CAP_FACTOR
         # Attitude-reference slew governor + EMA state (dedicated; axial block reuses last_t/has_last).
-        self.last_tilt_mag = 0.0
-        self.last_az = np.array([1.0, 0.0])
+        self.last_tilt_fwd = 0.0
+        self.last_tilt_left = 0.0
         self.last_att_t = -1.0
         self.has_last_att = False
-        self.last_tilt_mag_f = 0.0
-        self.last_az_f = np.array([1.0, 0.0])
+        self.last_tilt_fwd_f = 0.0
+        self.last_tilt_left_f = 0.0
         # Vertical-accel slew-limit state (Fix C, mirror C++).
         self.last_a_z = 0.0
         self.last_az_t = -1.0
@@ -833,12 +833,12 @@ class AdvancedHybridController:
         self.last_axial_accel = 0.0
         self.last_t = -1.0
         self.has_last = False
-        self.last_tilt_mag = 0.0
-        self.last_az = np.array([1.0, 0.0])
+        self.last_tilt_fwd = 0.0
+        self.last_tilt_left = 0.0
         self.last_att_t = -1.0
         self.has_last_att = False
-        self.last_tilt_mag_f = 0.0
-        self.last_az_f = np.array([1.0, 0.0])
+        self.last_tilt_fwd_f = 0.0
+        self.last_tilt_left_f = 0.0
         self.last_a_z = 0.0
         self.last_az_t = -1.0
         self.has_last_az = False
@@ -1069,13 +1069,19 @@ class AdvancedHybridController:
         # former theta_cmd / -phi_cmd at low tilt, and stay well-defined to +-180 deg.
         fwd_h = np.array([np.cos(az_bore), np.sin(az_bore)])
         left_h = np.array([-np.sin(az_bore), np.cos(az_bore)])
-        tilt_fwd = np.arctan2(float(np.dot(d[0:2], fwd_h)), d[2])
-        tilt_left = np.arctan2(float(np.dot(d[0:2], left_h)), d[2])
+        left_h3 = np.array([-np.sin(az_bore), np.cos(az_bore), 0.0])
+        def rotate_about_left(v, angle):
+            return (v * np.cos(angle) + np.cross(left_h3, v) * np.sin(angle)
+                    + left_h3 * float(np.dot(left_h3, v)) * (1.0 - np.cos(angle)))
+        tf = np.arctan2(float(np.dot(d[0:2], fwd_h)), d[2])
         # Nose-up cap from the gimbal's up-travel: the semi-strapdown servo can only compensate
         # so much nose-up body pitch (servo_cmd = -pitch + bias saturates at the mechanical max);
         # braking harder nose-up than that drops the boresight below the target.
         if self.has_gimbal and self.gimbal_nose_up_max > 0.0:
-            tilt_fwd = max(tilt_fwd, -(self.gimbal_nose_up_max - self.gimbal_bias))
+            tf_min = -(self.gimbal_nose_up_max - self.gimbal_bias)
+            if tf < tf_min:
+                d = rotate_about_left(d, tf_min - tf)
+                tf = tf_min
         if self.enable_fov_clamp and not self.has_gimbal and not target_behind:
             # Fixed-mount only: boresight elev = theta + mount_pitch, so clamp the forward tilt to
             # keep the target within fov_keep vertically. With the semi-strapdown gimbal the
@@ -1084,7 +1090,14 @@ class AdvancedHybridController:
             fov_keep = self.fov_half_v * self.fov_keep_margin
             theta_hi = min(self.max_tilt_rad, los_el - self.mount_pitch + fov_keep)
             theta_lo = max(-self.max_tilt_rad, los_el - self.mount_pitch - fov_keep)
-            tilt_fwd = clamp(tilt_fwd, min(theta_lo, theta_hi), max(theta_lo, theta_hi))
+            tf_lo = min(theta_lo, theta_hi)
+            tf_hi = max(theta_lo, theta_hi)
+            if tf < tf_lo:
+                d = rotate_about_left(d, tf_lo - tf)
+                tf = tf_lo
+            elif tf > tf_hi:
+                d = rotate_about_left(d, tf_hi - tf)
+                tf = tf_hi
         elif self.enable_fov_clamp and self.has_gimbal and not target_behind:
             # Gimbal vertical keep-in-frame: pitch cannot move the boresight, ALTITUDE can. If the
             # target approaches the bottom edge (los_el << boresight elev = -gimbal bias), command
@@ -1098,42 +1111,39 @@ class AdvancedHybridController:
                 a_z = min(a_z, -2.0 * clamp((-el_err - edge) / max(fov_keep - edge, 1e-3), 0.0, 1.0) * 4.0)
             elif el_err > edge:
                 a_z = max(a_z, 2.0 * clamp((el_err - edge) / max(fov_keep - edge, 1e-3), 0.0, 1.0) * 4.0)
-        # Recompute the spherical parametrization after the clamps.
+        # Recompute the spherical normal coordinates (tilt_fwd, tilt_left) in the boresight frame
+        # after the clamps: u = tilt_mag * s_az has norm ||u|| = tilt_mag in [0, pi] (valid past
+        # 90 deg for missile-mode dives, unlike tan()) and has no polar-azimuth singularity at
+        # tilt=0 (where an independent angular EMA/slew on s_az swung +-180 deg through full
+        # nose-up/nose-down pitch on bank reversals).
         d_h_mag = float(np.linalg.norm(d[0:2]))
-        tilt_mag = np.arctan2(d_h_mag, d[2])              # 0..pi (past 90 deg = dive)
-        s_az = d[0:2] / d_h_mag if d_h_mag > 1e-9 else fwd_h.copy()
+        tilt_mag_raw = np.arctan2(d_h_mag, d[2])          # 0..pi (past 90 deg = dive)
+        s_az_raw = d[0:2] / d_h_mag if d_h_mag > 1e-9 else fwd_h.copy()
+        tilt_fwd = tilt_mag_raw * float(np.dot(s_az_raw, fwd_h))
+        tilt_left = tilt_mag_raw * float(np.dot(s_az_raw, left_h))
         # Attitude-reference EMA low-pass (iter 2): suppress camera-rate content / roll
-        # limit-cycle, on the tilt magnitude and the tilt-azimuth unit vector (wrap-safe).
+        # limit-cycle on the boresight-frame spherical normal coordinates (tilt_fwd, tilt_left).
         if self.has_last_att and self.att_ref_tc > 1e-6:
             dt_att = t - self.last_att_t
             if 0.0 < dt_att < 1.0:
                 a_ref = clamp(dt_att / self.att_ref_tc, 0.0, 1.0)
-                tilt_mag = self.last_tilt_mag_f + a_ref * (tilt_mag - self.last_tilt_mag_f)
-                # angular EMA on the tilt azimuth (a vector lerp passes through ZERO on a bank
-                # reversal and snaps the direction — pure terminal noise)
-                az_now_e = np.arctan2(s_az[1], s_az[0])
-                az_last_e = np.arctan2(self.last_az_f[1], self.last_az_f[0])
-                az_f = az_last_e + a_ref * np.arctan2(np.sin(az_now_e - az_last_e),
-                                                     np.cos(az_now_e - az_last_e))
-                s_az = np.array([np.cos(az_f), np.sin(az_f)])
-        self.last_tilt_mag_f = tilt_mag
-        self.last_az_f = s_az.copy()
-        # Attitude-reference slew governor (iter 1): hard cap on |d(tilt_mag)/dt| and |d(az)/dt|.
+                tilt_fwd = self.last_tilt_fwd_f + a_ref * (tilt_fwd - self.last_tilt_fwd_f)
+                tilt_left = self.last_tilt_left_f + a_ref * (tilt_left - self.last_tilt_left_f)
+        self.last_tilt_fwd_f = tilt_fwd
+        self.last_tilt_left_f = tilt_left
+        # Attitude-reference slew governor (iter 1): hard cap on |d(tilt_fwd)/dt| and |d(tilt_left)/dt|.
         if self.has_last_att:
             dt_att = t - self.last_att_t
             if 0.0 < dt_att < 1.0:
                 max_dtilt = self.max_att_rate * dt_att
-                tilt_mag = clamp(tilt_mag, self.last_tilt_mag - max_dtilt, self.last_tilt_mag + max_dtilt)
-                az_now = np.arctan2(s_az[1], s_az[0])
-                az_last = np.arctan2(self.last_az[1], self.last_az[0])
-                d_az_s = np.arctan2(np.sin(az_now - az_last), np.cos(az_now - az_last))
-                d_az_s = clamp(d_az_s, -max_dtilt, max_dtilt)
-                az_new = az_last + d_az_s
-                s_az = np.array([np.cos(az_new), np.sin(az_new)])
-        self.last_tilt_mag = tilt_mag
-        self.last_az = s_az.copy()
+                tilt_fwd = clamp(tilt_fwd, self.last_tilt_fwd - max_dtilt, self.last_tilt_fwd + max_dtilt)
+                tilt_left = clamp(tilt_left, self.last_tilt_left - max_dtilt, self.last_tilt_left + max_dtilt)
+        self.last_tilt_fwd = tilt_fwd
+        self.last_tilt_left = tilt_left
         self.last_att_t = t
         self.has_last_att = True
+        tilt_mag = float(np.hypot(tilt_fwd, tilt_left))
+        s_az = (tilt_fwd * fwd_h + tilt_left * left_h) / tilt_mag if tilt_mag > 1e-9 else fwd_h.copy()
         # Reconstruct the desired thrust axis EXACTLY from the spherical parametrization (the
         # former tan() reconstruction silently inverted the direction past 90 deg of tilt), then
         # command rates via the TWO-CHANNEL decomposition (tailsitter-transition style):
