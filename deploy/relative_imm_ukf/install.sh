@@ -56,6 +56,7 @@ version="$(cat "$bundle_dir/VERSION")"
 [[ "$version" =~ ^[a-zA-Z0-9][a-zA-Z0-9._-]+$ ]] || fail "无效版本号。"
 [[ -x "$bundle_dir/bin/interceptor_node_relative_imm_ukf" ]] || fail "缺少可执行程序。"
 [[ -r "$bundle_dir/config/relative_imm_ukf_params.yaml" ]] || fail "缺少参数文件。"
+[[ -r "$bundle_dir/config/runtime.env" ]] || fail "Missing runtime environment file."
 [[ -f "$bundle_dir/runtime/lib/libvision_msgs__rosidl_typesupport_cpp.so" ]] \
     || fail "部署包缺少 vision_msgs 运行时库。"
 
@@ -83,9 +84,14 @@ unit="/etc/systemd/system/$service_name.service"
 [[ ! -e "$base/current" || -L "$base/current" ]] || fail "$base/current 已存在且不是符号链接。"
 
 mkdir -p "$config_dir" "$base/releases"
-created_config=false
-created_env=false
 backup="$(mktemp -d "/var/tmp/$service_name-backup.XXXXXX")"
+mkdir -p "$backup/config"
+for config_file in relative_imm_ukf_params.yaml runtime.env; do
+    if [[ -e "$config_dir/$config_file" || -L "$config_dir/$config_file" ]]; then
+        [[ ! -d "$config_dir/$config_file" ]] || fail "Configuration path is a directory: $config_dir/$config_file"
+        cp -a "$config_dir/$config_file" "$backup/config/$config_file"
+    fi
+done
 old_link="$(readlink "$base/current" 2>/dev/null || true)"
 old_active=false
 old_enabled=false
@@ -96,12 +102,13 @@ if [[ -e "$unit" || -L "$unit" ]]; then
 fi
 
 changed_service=false
+changed_config=false
 stage=""
 rollback() {
     local status=$?
     trap - EXIT
     if [[ "$status" -ne 0 ]]; then
-        echo "部署失败，恢复部署前的服务配置。备份：$backup" >&2
+        echo "Deployment failed; restoring the previous service and runtime configuration. Backup: $backup" >&2
         if $changed_service; then
             systemctl stop "$service_name" || true
             systemctl disable "$service_name" >/dev/null 2>&1 || true
@@ -113,27 +120,26 @@ rollback() {
             if [[ -n "$old_link" ]]; then
                 ln -s "$old_link" "$base/current"
             fi
+        fi
+        # Restore runtime files before restarting the previous release.
+        if $changed_config; then
+            for config_file in relative_imm_ukf_params.yaml runtime.env; do
+                rm -f "$config_dir/$config_file"
+                if [[ -e "$backup/config/$config_file" || -L "$backup/config/$config_file" ]]; then
+                    cp -a "$backup/config/$config_file" "$config_dir/$config_file"
+                fi
+            done
+        fi
+        if $changed_service; then
             systemctl daemon-reload || true
             if $old_enabled; then systemctl enable "$service_name" || true; fi
             if $old_active; then systemctl start "$service_name" || true; fi
         fi
-        if $created_config; then rm -f "$config_dir/relative_imm_ukf_params.yaml"; fi
-        if $created_env; then rm -f "$config_dir/runtime.env"; fi
     fi
     if [[ -n "$stage" && -d "$stage" ]]; then rm -rf -- "$stage"; fi
     exit "$status"
 }
 trap rollback EXIT
-
-# 已有配置保持原样；首次部署使用包内默认参数。
-if [[ ! -e "$config_dir/relative_imm_ukf_params.yaml" ]]; then
-    install -m 0644 "$bundle_dir/config/relative_imm_ukf_params.yaml" "$config_dir/relative_imm_ukf_params.yaml"
-    created_config=true
-fi
-if [[ ! -e "$config_dir/runtime.env" ]]; then
-    install -m 0644 "$bundle_dir/config/runtime.env" "$config_dir/runtime.env"
-    created_env=true
-fi
 
 release="$base/releases/$version"
 if [[ -e "$release" ]]; then
@@ -151,7 +157,15 @@ fi
 
 changed_service=true
 # 换版前停旧进程，避免两个实例同时发布 /fpv/control_command。
-systemctl stop "$service_name" 2>/dev/null || true
+if $old_active; then
+    systemctl stop "$service_name"
+else
+    systemctl stop "$service_name" 2>/dev/null || true
+fi
+# Every installation replaces both runtime files with the validated package copies.
+changed_config=true
+install -m 0644 "$release/config/relative_imm_ukf_params.yaml" "$config_dir/relative_imm_ukf_params.yaml"
+install -m 0644 "$release/config/runtime.env" "$config_dir/runtime.env"
 ln -s "releases/$version" "$base/.current.$$"
 mv -Tf "$base/.current.$$" "$base/current"
 install -m 0644 "$release/$service_name.service" "$unit"
@@ -175,5 +189,5 @@ echo "部署成功：$release"
 echo "服务已运行并启用开机自启；CPU 亲和力：$affinity"
 echo "状态：systemctl status $service_name；日志：journalctl -u $service_name -f"
 echo "参数：$config_dir/relative_imm_ukf_params.yaml；运行开关：$config_dir/runtime.env"
-echo "服务配置备份：$backup"
+echo "Service and runtime configuration backup: $backup"
 echo "请按 README.md 用真实话题数据核验；进程存活不等于功能验收通过。"

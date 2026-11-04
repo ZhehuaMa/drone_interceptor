@@ -18,6 +18,18 @@ sudo bash install.sh --check   # 只做环境与完整性检查，不改系统
 sudo bash install.sh           # 安装 + 启动 + 开机自启 + 校验绑核
 ```
 
+Every installation or upgrade replaces both
+`/etc/drone_interceptor/relative_imm_ukf_params.yaml` and
+`/etc/drone_interceptor/runtime.env` with the package copies. This also replaces
+local tuning and runtime switches; files are not merged. For example, a local
+`USE_RADAR=true` is replaced by the packaged `USE_RADAR` value.
+
+The installer backs up existing files under
+`/var/tmp/drone-interceptor-backup.<suffix>/config/` and prints that backup
+directory. It stops the previous service before replacing configuration. If
+deployment fails, it restores the previous files before restarting the previous
+release. Files absent before installation are removed during rollback.
+
 安装成功的判据（脚本内部已逐条断言，任一条不满足即回滚）：
 
 - 服务处于 active 且 `NRestarts == 0`（启动后 5 秒内没有崩溃重启）
@@ -30,8 +42,8 @@ sudo bash install.sh           # 安装 + 启动 + 开机自启 + 校验绑核
 |------|------|
 | `/opt/drone_interceptor-binary/releases/<版本>/` | 本次发布的只读内容 |
 | `/opt/drone_interceptor-binary/current` | 指向当前发布的符号链接，服务只读它 |
-| `/etc/drone_interceptor/relative_imm_ukf_params.yaml` | 运行参数（首次安装写入，之后升级**不覆盖**） |
-| `/etc/drone_interceptor/runtime.env` | 运行开关（CPU 绑核、仿真/雷达开关、日志等级） |
+| `/etc/drone_interceptor/relative_imm_ukf_params.yaml` | Runtime parameters; replaced with the package copy on every installation or upgrade |
+| `/etc/drone_interceptor/runtime.env` | Runtime switches (CPU affinity, simulation/radar, logging); replaced with the package copy on every installation or upgrade |
 | `/etc/systemd/system/drone-interceptor.service` | 服务单元 |
 | `/var/log/drone_interceptor/` | ROS 日志目录 |
 
@@ -92,6 +104,12 @@ ros2 topic hz /fpv/control_command       # 启动任务后，结合 IMU 与有�
 `/fpv/mission_state` 变化与 `/fpv/control_command` 输出合理。启用雷达时，还需验证两路雷达航迹及视觉接管。
 
 ## 回滚
+
+The automatic failure rollback restores both the release and runtime files.
+The manual commands below switch only the executable release. To restore a
+previous deployment's configuration too, copy its files from the backup
+directory printed by that installation while the service is stopped, then
+start the service. Use backups from the deployment you are undoing.
 
 旧版本仍保留在 `/opt/drone_interceptor-binary/releases/` 下：
 
